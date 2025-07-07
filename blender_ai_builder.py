@@ -9,57 +9,81 @@ bl_info = {
 }
 
 import bpy
+import requests
+import ast
 
 # ---------- Operator ----------
 
 class OBJECT_OT_ai_builder(bpy.types.Operator):
-    """Parses text input and creates objects"""
+    """Parses text input with OpenAI and creates objects"""
     bl_idname = "object.ai_builder"
     bl_label = "AI Build"
 
     def execute(self, context):
-        prompt = context.scene.ai_builder_prompt.lower()
+        prompt = context.scene.ai_builder_prompt
 
-        # Keyword-based parsing
-        if "room" in prompt:
-            self.create_room()
-        if "desk" in prompt:
-            self.create_desk()
-        if "lamp" in prompt:
-            self.create_lamp()
+        # Call OpenAI GPT to parse prompt
+        parsed_objects = self.call_openai(prompt)
+
+        # Process parsed objects
+        for obj in parsed_objects:
+            name = obj.get("name")
+            if name == "room":
+                self.create_room()
+            elif name == "desk":
+                self.create_desk()
+            elif name == "lamp":
+                self.create_lamp()
+            else:
+                self.report({'WARNING'}, f"Unknown object: {name}")
 
         self.report({'INFO'}, "AI Build completed.")
         return {'FINISHED'}
 
+    def call_local_llm(prompt):
+        url = "http://127.0.0.1:8000/parse"
+        system_prompt = (
+            "You are a helpful assistant that extracts structured object data "
+            "from user scene creation instructions. "
+            "Return output as a JSON list of objects with 'name' field. "
+            "For example: [{'name': 'room'}, {'name': 'desk'}, {'name': 'lamp'}]"
+        )
+        full_prompt = f"{system_prompt}\n\nInstruction: {prompt}"
+
+        try:
+            response = requests.post(url, json={"prompt": full_prompt})
+            if response.status_code == 200:
+                data = response.json()
+                parsed_objects = ast.literal_eval(data["result"])
+                return parsed_objects
+        except Exception as e:
+            print(f"LLM server error: {e}")
+        return []
+
+
     def create_room(self):
-        # Create floor
         bpy.ops.mesh.primitive_plane_add(size=10, location=(0, 0, 0))
         floor = bpy.context.active_object
         floor.name = "Floor"
 
-        # Create four walls (simple cubes scaled)
         wall_thickness = 0.1
         wall_height = 3
 
-        # Back wall
         bpy.ops.mesh.primitive_cube_add(location=(0, -5, wall_height/2))
         back_wall = bpy.context.active_object
         back_wall.scale = (5, wall_thickness, wall_height/2)
         back_wall.name = "Back Wall"
 
-        # Front wall
         bpy.ops.mesh.primitive_cube_add(location=(0, 5, wall_height/2))
         front_wall = bpy.context.active_object
         front_wall.scale = (5, wall_thickness, wall_height/2)
         front_wall.name = "Front Wall"
 
-        # Left wall
         bpy.ops.mesh.primitive_cube_add(location=(-5, 0, wall_height/2))
         left_wall = bpy.context.active_object
         left_wall.scale = (wall_thickness, 5, wall_height/2)
         left_wall.name = "Left Wall"
 
-        # Right wall
         bpy.ops.mesh.primitive_cube_add(location=(5, 0, wall_height/2))
         right_wall = bpy.context.active_object
         right_wall.scale = (wall_thickness, 5, wall_height/2)
@@ -72,12 +96,10 @@ class OBJECT_OT_ai_builder(bpy.types.Operator):
         desk.name = "Desk"
 
     def create_lamp(self):
-        # Lamp stand
         bpy.ops.mesh.primitive_cylinder_add(radius=0.05, depth=1, location=(0.5, 0, 1.5))
         stand = bpy.context.active_object
         stand.name = "Lamp Stand"
 
-        # Lamp head
         bpy.ops.mesh.primitive_uv_sphere_add(radius=0.2, location=(0.5, 0, 2))
         head = bpy.context.active_object
         head.name = "Lamp Head"
