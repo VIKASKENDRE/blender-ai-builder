@@ -33,7 +33,7 @@ Clone this repository:
 bash
 Copy
 Edit
-git clone https://github.com/yourusername/blender-ai-builder.git
+git clone https://github.com/VIKASKENDRE/blender-ai-builder.git
 Open Blender → Preferences → Add-ons → Install.
 
 Select the blender_ai_builder.zip and enable it.
